@@ -50,7 +50,7 @@
 						<configuration>
 							<archive>
 								<manifest>
-									<mainClass>de.mas.wiiu.jnuslib.decryptor.Main</mainClass>
+									<mainClass>de.mas.jnuslib.decryptor.Main</mainClass>
 								</manifest>
 							</archive>
 							<descriptorRefs>
