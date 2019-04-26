@@ -11,7 +11,7 @@ JNUSLib Decryptor 0.1 - Maschell
 
 usage:
  -commonkey <WiiU common key>   Optional. HexString. Will be used if no "common.key" in the folder
-                                of this .jar is found
+                                of this .jar or in "~/.wiiu/common.key" is found
  -file <regular expression>     Decrypts the files that matches the given regular expression.
  -help                          shows this text
  -in <input file>               Input file. Expects a folder which contains the .app, and .tmd
@@ -20,7 +20,6 @@ usage:
  -overwrite                     Optional. Overwrites existing files
  -titlekey <Ticket title key>   Optional. HexString. Will be used if no "title.tik" in the folder is
                                 found
- -whole                         Decrypts the whole content files.
  ```
 
 Requires Java 8.

@@ -20,6 +20,7 @@ package de.mas.jnuslib.decryptor;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Optional;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -36,6 +37,7 @@ import de.mas.wiiu.jnus.NUSTitleLoaderLocal;
 import de.mas.wiiu.jnus.Settings;
 import de.mas.wiiu.jnus.entities.TMD;
 import de.mas.wiiu.jnus.entities.Ticket;
+import de.mas.wiiu.jnus.implementations.FSTDataProviderNUSTitle;
 import de.mas.wiiu.jnus.utils.Utils;
 
 public class Main {
@@ -45,8 +47,10 @@ public class Main {
     private static final String OPTION_COMMON_KEY = "commonkey";
     private static final String OPTION_TITLEKEY = "titlekey";
     private static final String OPTION_OVERWRITE = "overwrite";
-    private static final String OPTION_DECRYPT_WHOLE = "whole";
     private static final String OPTION_FILE = "file";
+    private static byte[] commonKey;
+
+    private static final String HOMEPATH = System.getProperty("user.home") + File.separator + ".wiiu";
 
     public static void main(String[] args) throws Exception {
         System.out.println("JNUSLib Decryptor 0.1 - Maschell");
@@ -75,7 +79,9 @@ public class Main {
         String output = null;
         boolean overwrite = false;
         byte[] titlekey = null;
-        readKey();
+
+        readKey(new File(HOMEPATH + File.separator + "common.key")).ifPresent(key -> Main.commonKey = key);
+        readKey(new File("common.key")).ifPresent(key -> Main.commonKey = key);
 
         if (cmd.hasOption(OPTION_HELP)) {
             showHelp(options);
@@ -93,7 +99,7 @@ public class Main {
             String commonKey = cmd.getOptionValue(OPTION_COMMON_KEY);
             byte[] key = Utils.StringToByteArray(commonKey);
             if (key.length == 0x10) {
-                Settings.commonKey = key;
+                Main.commonKey = key;
                 System.out.println("Commonkey was set to: " + Utils.ByteArrayToString(key));
             }
         }
@@ -118,21 +124,15 @@ public class Main {
         }
 
         String regex = ".*";
-        if (cmd.hasOption(OPTION_DECRYPT_WHOLE)) {
-            decryptContents(input, output, overwrite, titlekey);
-            return;
-        }
 
         if (cmd.hasOption(OPTION_FILE)) {
             regex = cmd.getOptionValue(OPTION_FILE);
             System.out.println("Decrypting files matching \"" + regex + "\"");
         }
         decryptFile(input, output, regex, overwrite, titlekey);
-
     }
 
     private static NUSTitle getTitle(String input, boolean overwrite, byte[] titlekey) throws IOException, Exception {
-
         if (input == null) {
             System.out.println("You need to provide an input file");
         }
@@ -143,22 +143,13 @@ public class Main {
         NUSTitle title = null;
 
         if (titlekey != null) {
-            title = NUSTitleLoaderLocal.loadNUSTitle(inputFile.getAbsolutePath(),
-                    Ticket.createTicket(titlekey, TMD.parseTMD(new File(inputFile.getAbsolutePath() + File.separator + Settings.TMD_FILENAME)).getTitleID()));
+            title = NUSTitleLoaderLocal.loadNUSTitle(inputFile.getAbsolutePath(), Ticket.createTicket(titlekey,
+                    TMD.parseTMD(new File(inputFile.getAbsolutePath() + File.separator + Settings.TMD_FILENAME)).getTitleID(), Main.commonKey));
         } else {
-            title = NUSTitleLoaderLocal.loadNUSTitle(inputFile.getAbsolutePath());
+            title = NUSTitleLoaderLocal.loadNUSTitle(inputFile.getAbsolutePath(), Main.commonKey);
         }
 
         return title;
-    }
-
-    private static void decryptContents(String input, String output, boolean overwrite, byte[] titleKey) throws IOException, Exception {
-        NUSTitle title = getTitle(input, overwrite, titleKey);
-        if (title == null) {
-            System.err.println("Failed to open title.");
-            return;
-        }
-        DecryptionService.getInstance(title).decryptAllPlainContents(output);
     }
 
     private static void decryptFile(String input, String output, String regex, boolean overwrite, byte[] titlekey) throws Exception {
@@ -180,21 +171,25 @@ public class Main {
         File outputFolder = new File(newOutput);
 
         System.out.println("To the folder: " + outputFolder.getAbsolutePath());
-        title.setSkipExistingFiles(!overwrite);
-        DecryptionService decryption = DecryptionService.getInstance(title);
+        DecryptionService decryption = DecryptionService.getInstance(new FSTDataProviderNUSTitle(title));
 
-        decryption.decryptFSTEntriesTo(regex, outputFolder.getAbsolutePath());
+        decryption.decryptFSTEntriesTo(regex, outputFolder.getAbsolutePath(), overwrite);
 
         System.out.println("Decryption done");
     }
 
-    private static void readKey() throws IOException {
-        File file = new File("common.key");
+    private static Optional<byte[]> readKey(File file) {
         if (file.isFile()) {
-            byte[] key = Files.readAllBytes(file.toPath());
-            Settings.commonKey = key;
-            System.out.println("Commonkey was set to: " + Utils.ByteArrayToString(key));
+            byte[] key;
+            try {
+                key = Files.readAllBytes(file.toPath());
+                if (key != null && key.length == 16) {
+                    return Optional.of(key);
+                }
+            } catch (IOException e) {
+            }
         }
+        return Optional.empty();
     }
 
     private static Options getOptions() {
@@ -210,7 +205,6 @@ public class Main {
                 .desc("Optional. HexString. Will be used if no \"title.tik\" in the folder is found").build());
         options.addOption(Option.builder(OPTION_FILE).argName("regular expression").hasArg()
                 .desc("Decrypts the files that matches the given regular expression.").build());
-        options.addOption(Option.builder(OPTION_DECRYPT_WHOLE).desc("Decrypts the whole content files.").build());
 
         options.addOption(OPTION_HELP, false, "shows this text");
 
