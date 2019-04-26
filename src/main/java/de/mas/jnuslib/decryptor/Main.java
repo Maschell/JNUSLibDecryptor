@@ -132,7 +132,7 @@ public class Main {
         decryptFile(input, output, regex, overwrite, titlekey);
     }
 
-    private static NUSTitle getTitle(String input, boolean overwrite, byte[] titlekey) throws IOException, Exception {
+    private static NUSTitle getTitle(String input, byte[] titlekey) throws IOException, Exception {
         if (input == null) {
             System.out.println("You need to provide an input file");
         }
@@ -153,7 +153,7 @@ public class Main {
     }
 
     private static void decryptFile(String input, String output, String regex, boolean overwrite, byte[] titlekey) throws Exception {
-        NUSTitle title = getTitle(input, overwrite, titlekey);
+        NUSTitle title = getTitle(input, titlekey);
 
         if (title == null) {
             System.err.println("Failed to open title.");
@@ -173,7 +173,7 @@ public class Main {
         System.out.println("To the folder: " + outputFolder.getAbsolutePath());
         DecryptionService decryption = DecryptionService.getInstance(new FSTDataProviderNUSTitle(title));
 
-        decryption.decryptFSTEntriesTo(regex, outputFolder.getAbsolutePath(), overwrite);
+        decryption.decryptFSTEntriesTo(regex, outputFolder.getAbsolutePath(), !overwrite);
 
         System.out.println("Decryption done");
     }
